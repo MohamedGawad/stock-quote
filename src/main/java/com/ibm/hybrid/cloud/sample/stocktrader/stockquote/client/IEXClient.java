@@ -16,7 +16,7 @@
 
 package com.ibm.hybrid.cloud.sample.stocktrader.stockquote.client;
 
-import com.ibm.hybrid.cloud.sample.stocktrader.stockquote.json.Quote;
+import com.ibm.hybrid.cloud.sample.stocktrader.stockquote.json.QuoteV2;
 
 import javax.enterprise.context.Dependent;
 import javax.ws.rs.ApplicationPath;
@@ -36,5 +36,5 @@ public interface IEXClient {
 	@GET
 	@Path("/{symbol}/quote")
 	@Produces("application/json")
-	public Quote getStockQuoteViaIEX(@PathParam("symbol") String symbol, @QueryParam("token") String token);
+	public QuoteV2 getStockQuoteViaIEX(@PathParam("symbol") String symbol, @QueryParam("token") String token);
 }

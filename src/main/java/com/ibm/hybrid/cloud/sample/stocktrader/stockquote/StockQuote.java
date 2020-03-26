@@ -19,6 +19,7 @@ package com.ibm.hybrid.cloud.sample.stocktrader.stockquote;
 import com.ibm.hybrid.cloud.sample.stocktrader.stockquote.client.APIConnectClient;
 import com.ibm.hybrid.cloud.sample.stocktrader.stockquote.client.IEXClient;
 import com.ibm.hybrid.cloud.sample.stocktrader.stockquote.json.Quote;
+import com.ibm.hybrid.cloud.sample.stocktrader.stockquote.json.QuoteV2;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -96,7 +97,7 @@ public class StockQuote extends Application {
 		}
 
 		mpUrlPropName = IEXClient.class.getName() + "/mp-rest/url";
-		urlFromEnv = "https://cloud.iexapis.com/stable/stock";
+		urlFromEnv = "https://cloud.iexapis.com/stable/stock/";
 		System.getenv("IEX_URL");
 		if ((urlFromEnv != null) && !urlFromEnv.isEmpty()) {
 			logger.info("Using IEX URL from config map: " + urlFromEnv);
@@ -116,8 +117,8 @@ public class StockQuote extends Application {
 		try {
 			if (args.length > 0) {
 				StockQuote stockQuote = new StockQuote();
-				Quote quote = stockQuote.getStockQuote("twtr");
-				logger.info("$"+quote.getPrice());
+				QuoteV2 quote = stockQuote.getStockQuote("twtr");
+				logger.info("$"+quote.getLatestPrice());
 			} else {
 				logger.info("Usage: StockQuote <symbol>");
 			}
@@ -213,10 +214,10 @@ public class StockQuote extends Application {
 	@GET
 	@Path("/{symbol}")
 	@Produces("application/json")
-	@Fallback(fallbackMethod = "getStockQuoteViaIEX")
+//	@Fallback(fallbackMethod = "getStockQuoteViaIEX")
 //	@RolesAllowed({"StockTrader", "StockViewer"}) //Couldn't get this to work; had to do it through the web.xml instead :(
 	/**  Get stock quote from API Connect */
-	public Quote getStockQuote(@PathParam("symbol") String symbol) throws IOException {
+	public QuoteV2 getStockQuote(@PathParam("symbol") String symbol) throws IOException {
 		if (symbol.equalsIgnoreCase(TEST_SYMBOL)) return getTestQuote(TEST_SYMBOL, TEST_PRICE);
 		if (symbol.equalsIgnoreCase(SLOW_SYMBOL)) return getSlowQuote();
 		if (symbol.equalsIgnoreCase(FAIL_SYMBOL)) { //to help test Istio retry policies
@@ -224,7 +225,7 @@ public class StockQuote extends Application {
 			throw new RuntimeException("Failing as requested, since you asked for FAIL!");
 		}
 
-		Quote quote = null;
+		QuoteV2 quote = null;
 		if (jedisPool != null) try {
 			Jedis jedis = jedisPool.getResource(); //Get a connection from the pool
 			if (jedis==null) logger.warning("Unable to get connection to Redis from pool");
@@ -236,6 +237,7 @@ public class StockQuote extends Application {
 				// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol); //so go get it like we did before we'd ever heard of Redis
 				quote = getStockQuoteViaIEX(symbol);
 				logger.info("Got quote for "+symbol+" from IEX");
+				logger.info("quote>>>>>>>>>>..."+ quote.toString()); 
 				jedis.set(symbol, quote.toString()); //Put in Redis so it's there next time we ask
 				logger.info("Put "+symbol+" in Redis");
 			} else {
@@ -243,7 +245,7 @@ public class StockQuote extends Application {
 
 				try {
 					Jsonb jsonb = JsonbBuilder.create();
-					quote = jsonb.fromJson(cachedValue, Quote.class);
+					quote = jsonb.fromJson(cachedValue, QuoteV2.class);
 				} catch (Throwable t4) {
 					logger.info("Unable to parse JSON obtained from Redis.  Proceeding as if the quote was too stale.");
 					logException(t4);
@@ -254,6 +256,7 @@ public class StockQuote extends Application {
 					try {
 						// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol); //so go get a less stale value
 						quote = getStockQuoteViaIEX(symbol);
+						logger.info("quote>>>>>>>>>>..."+ quote.toString()); 
 						logger.info("Got quote for "+symbol+" from IEX");
 						jedis.set(symbol, quote.toString()); //Put in Redis so it's there next time we ask
 						logger.info("Refreshed "+symbol+" in Redis");
@@ -275,6 +278,7 @@ public class StockQuote extends Application {
 			try {
 				// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol);
 				quote = getStockQuoteViaIEX(symbol);
+				logger.info("quote>>>>>>>>>>..."+ quote.toString());
 				logger.info("Got quote for "+symbol+" from IEX");
 			} catch (Throwable t2) {
 				logException(t2);
@@ -286,6 +290,7 @@ public class StockQuote extends Application {
 				logger.warning("Redis URL not configured, so driving call directly to API Connect");
 				// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol);
 				quote = getStockQuoteViaIEX(symbol);
+				logger.info("quote>>>>>>>>>>..."+ quote.toString());
 				logger.info("Got quote for "+symbol+" from IEX");
 			} catch (Throwable t3) {
 				logException(t3);
@@ -297,18 +302,18 @@ public class StockQuote extends Application {
 	}
 
 	/** When API Connect is unavailable, fall back to calling IEX directly to get the stock quote */
-	public Quote getStockQuoteViaIEX(String symbol) throws IOException {
+	public QuoteV2 getStockQuoteViaIEX(String symbol) throws IOException {
 		logger.info("Using ***************** method getStockQuoteViaIEX");
 		logger.info("symbol>>>>>>>>>>"+symbol);
 		logger.info("iexApiKey>>>>>>>"+iexApiKey);
 		return iexClient.getStockQuoteViaIEX(symbol, iexApiKey);
 	}
 
-	private boolean isStale(Quote quote) {
+	private boolean isStale(QuoteV2 quote) {
 		if (quote==null) return true;
 
 		long now = System.currentTimeMillis();
-		long then = quote.getTime();
+		long then = quote.getHighTime();
 
 		if (then==0) return true; //no time value present in quote
 		long difference = now - then;
@@ -319,20 +324,20 @@ public class StockQuote extends Application {
 		return (difference > cache_interval*MINUTE_IN_MILLISECONDS); //cached quote is too old
     }
 
-	private Quote getTestQuote(String symbol, double price) { //in case API Connect or IEX is down or we're rate limited
+	private QuoteV2 getTestQuote(String symbol, double price) { //in case API Connect or IEX is down or we're rate limited
 		Date now = new Date();
 		String today = formatter.format(now);
 
 		logger.info("Building a hard-coded quote (bypassing Redis and API Connect");
 
-		Quote quote = new Quote(symbol, price, today);
+		QuoteV2 quote = new QuoteV2(symbol, price, today);
 
 		logger.info("Returning hard-coded quote: "+quote!=null ? quote.toString() : "null");
 
 		return quote;
 	}
 
-	private Quote getSlowQuote() { //to help test Istio timeout policies; deliberately not put in Redis cache
+	private QuoteV2 getSlowQuote() { //to help test Istio timeout policies; deliberately not put in Redis cache
 		logger.info("Sleeping for one minute for symbol SLOW!");
 
 		try {
