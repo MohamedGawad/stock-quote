@@ -43,12 +43,12 @@ spec:
           - name: REDIS_URL
             valueFrom:
               secretKeyRef:
-                name: redis-conn
+                name: redis
                 key: url
           - name: CACHE_INTERVAL
             valueFrom:
               secretKeyRef:
-                name: redis-conn
+                name: redis
                 key: cache-interval
                 optional: true
           - name: JWT_AUDIENCE
@@ -63,26 +63,26 @@ spec:
                 key: issuer
           - name: STOCKQUOTE_URL
             valueFrom:
-              configMapKeyRef:
+              secretKeyRef:
                 name: urls
                 key: stockquote
                 optional: true
           - name: API_CONNECT_URL
             valueFrom:
-              secretKeyRef:
-                name: iex-conn
+              configMapKeyRef:
+                name: urls
                 key: api-connect
                 optional: true
           - name: IEX_URL
             valueFrom:
-              secretKeyRef:
-                name: iex-conn
+              configMapKeyRef:
+                name: urls
                 key: iex
                 optional: true
           - name: IEX_API_KEY
             valueFrom:
               secretKeyRef:
-                name: iex-conn
+                name: redis
                 key: iex-api-key
                 optional: true
           - name: WLP_LOGGING_CONSOLE_FORMAT
@@ -138,4 +138,19 @@ spec:
       targetPort: 9443
   selector:
     app: stock-quote
-
+---
+#Deploy the autoscaler
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: stock-quote-hpa
+  labels:
+    solution: stock-trader
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: stock-quote
+  maxReplicas: 10
+  minReplicas: 2
+  targetCPUUtilizationPercentage: 60
