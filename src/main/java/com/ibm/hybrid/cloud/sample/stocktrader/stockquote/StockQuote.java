@@ -96,7 +96,8 @@ public class StockQuote extends Application {
 		}
 
 		mpUrlPropName = IEXClient.class.getName() + "/mp-rest/url";
-		urlFromEnv = System.getenv("IEX_URL");
+		urlFromEnv = "https://cloud.iexapis.com/stable/stock";
+		System.getenv("IEX_URL");
 		if ((urlFromEnv != null) && !urlFromEnv.isEmpty()) {
 			logger.info("Using IEX URL from config map: " + urlFromEnv);
 			System.setProperty(mpUrlPropName, urlFromEnv);
@@ -234,7 +235,7 @@ public class StockQuote extends Application {
 				logger.info(symbol+" wasn't in Redis so we will try to put it there");
 				// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol); //so go get it like we did before we'd ever heard of Redis
 				quote = getStockQuoteViaIEX(symbol);
-				logger.info("Got quote for "+symbol+" from API Connect");
+				logger.info("Got quote for "+symbol+" from IEX");
 				jedis.set(symbol, quote.toString()); //Put in Redis so it's there next time we ask
 				logger.info("Put "+symbol+" in Redis");
 			} else {
@@ -253,7 +254,7 @@ public class StockQuote extends Application {
 					try {
 						// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol); //so go get a less stale value
 						quote = getStockQuoteViaIEX(symbol);
-						logger.info("Got quote for "+symbol+" from API Connect");
+						logger.info("Got quote for "+symbol+" from IEX");
 						jedis.set(symbol, quote.toString()); //Put in Redis so it's there next time we ask
 						logger.info("Refreshed "+symbol+" in Redis");
 					} catch (Throwable t) {
@@ -274,7 +275,7 @@ public class StockQuote extends Application {
 			try {
 				// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol);
 				quote = getStockQuoteViaIEX(symbol);
-				logger.info("Got quote for "+symbol+" from API Connect");
+				logger.info("Got quote for "+symbol+" from IEX");
 			} catch (Throwable t2) {
 				logException(t2);
 				return getTestQuote(symbol, ERROR);
@@ -285,7 +286,7 @@ public class StockQuote extends Application {
 				logger.warning("Redis URL not configured, so driving call directly to API Connect");
 				// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol);
 				quote = getStockQuoteViaIEX(symbol);
-				logger.info("Got quote for "+symbol+" from API Connect");
+				logger.info("Got quote for "+symbol+" from IEX");
 			} catch (Throwable t3) {
 				logException(t3);
 				return getTestQuote(symbol, ERROR);
@@ -297,7 +298,9 @@ public class StockQuote extends Application {
 
 	/** When API Connect is unavailable, fall back to calling IEX directly to get the stock quote */
 	public Quote getStockQuoteViaIEX(String symbol) throws IOException {
-		logger.info("Using fallback method getStockQuoteViaIEX");
+		logger.info("Using ***************** method getStockQuoteViaIEX");
+		logger.info("symbol>>>>>>>>>>"+symbol);
+		logger.info("iexApiKey>>>>>>>"+iexApiKey);
 		return iexClient.getStockQuoteViaIEX(symbol, iexApiKey);
 	}
 
