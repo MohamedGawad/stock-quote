@@ -104,7 +104,8 @@ public class StockQuote extends Application {
 			logger.info("IEX URL not found from env var from config map, so defaulting to value in jvm.options: " + System.getProperty(mpUrlPropName));
 		}
 	
-		iexApiKey = System.getenv("IEX_API_KEY");
+		iexApiKey =  System.getenv("IEX_API_KEY");
+		// System.getenv("IEX_API_KEY");
 		if ((iexApiKey == null) || iexApiKey.isEmpty()) {
 			logger.warning("No API key provided for IEX.  If API Connect isn't available, fallback to direct calls to IEX will fail");
 		}
@@ -114,7 +115,7 @@ public class StockQuote extends Application {
 		try {
 			if (args.length > 0) {
 				StockQuote stockQuote = new StockQuote();
-				Quote quote = stockQuote.getStockQuote(args[0]);
+				Quote quote = stockQuote.getStockQuote("twtr");
 				logger.info("$"+quote.getPrice());
 			} else {
 				logger.info("Usage: StockQuote <symbol>");
@@ -231,7 +232,8 @@ public class StockQuote extends Application {
 			String cachedValue = jedis.get(symbol); //Try to get it from Redis
 			if (cachedValue == null) { //It wasn't in Redis
 				logger.info(symbol+" wasn't in Redis so we will try to put it there");
-				quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol); //so go get it like we did before we'd ever heard of Redis
+				// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol); //so go get it like we did before we'd ever heard of Redis
+				quote = getStockQuoteViaIEX(symbol);
 				logger.info("Got quote for "+symbol+" from API Connect");
 				jedis.set(symbol, quote.toString()); //Put in Redis so it's there next time we ask
 				logger.info("Put "+symbol+" in Redis");
@@ -249,7 +251,8 @@ public class StockQuote extends Application {
 				if (isStale(quote)) {
 					logger.info(symbol+" in Redis was too stale");
 					try {
-						quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol); //so go get a less stale value
+						// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol); //so go get a less stale value
+						quote = getStockQuoteViaIEX(symbol);
 						logger.info("Got quote for "+symbol+" from API Connect");
 						jedis.set(symbol, quote.toString()); //Put in Redis so it's there next time we ask
 						logger.info("Refreshed "+symbol+" in Redis");
@@ -269,7 +272,8 @@ public class StockQuote extends Application {
 			
 			//something went wrong using Redis.  Fall back to the old-fashioned direct approach
 			try {
-				quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol);
+				// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol);
+				quote = getStockQuoteViaIEX(symbol);
 				logger.info("Got quote for "+symbol+" from API Connect");
 			} catch (Throwable t2) {
 				logException(t2);
@@ -279,7 +283,8 @@ public class StockQuote extends Application {
 			//Redis not configured.  Fall back to the old-fashioned direct approach
 			try {
 				logger.warning("Redis URL not configured, so driving call directly to API Connect");
-				quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol);
+				// quote = apiConnectClient.getStockQuoteViaAPIConnect(symbol);
+				quote = getStockQuoteViaIEX(symbol);
 				logger.info("Got quote for "+symbol+" from API Connect");
 			} catch (Throwable t3) {
 				logException(t3);
